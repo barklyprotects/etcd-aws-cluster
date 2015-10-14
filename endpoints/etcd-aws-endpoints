@@ -1,0 +1,34 @@
+#! /bin/bash
+pkg="etcd-aws-endpoints"
+etcd_peers_file_path="/etc/sysconfig/etcd-peers"
+region=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | jq --raw-output .region)
+if [[ ! $region ]]; then
+    echo "$pkg: failed to get region"
+    exit 1
+fi
+
+# Get asg via command line argument
+asg_name="$ETCD_ASG"
+if [ -f "$asg_name" ]; then
+  echo "$pkg: no asg name provided, exiting"
+  exit 0
+fi
+
+# ETCD API https://coreos.com/etcd/docs/2.0.11/other_apis.html
+add_ok=201
+already_added=409
+delete_ok=204
+
+etcd_client_scheme=${ETCD_CLIENT_SCHEME:-http}
+
+etcd_peer_urls=$(aws ec2 describe-instances --region $region --instance-ids $(aws autoscaling describe-auto-scaling-groups --region $region --auto-scaling-group-name $asg_name | jq '.AutoScalingGroups[0].Instances[] | select(.LifecycleState  == "InService") | .InstanceId' | xargs) | jq -r ".Reservations[].Instances | map(\"$etcd_client_scheme://\" + .NetworkInterfaces[].PrivateIpAddress + \":2379\")[]" | sed -e ':a;N;$!ba;s/\n/,/g')
+
+if [[ ! $etcd_peer_urls ]]; then
+    echo "$pkg: unable to find members of auto scaling group"
+    exit 5
+fi
+
+
+echo "$etcd_peer_urls"
+
+exit 0

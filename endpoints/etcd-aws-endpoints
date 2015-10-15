@@ -21,14 +21,24 @@ delete_ok=204
 
 etcd_client_scheme=${ETCD_CLIENT_SCHEME:-http}
 
-etcd_peer_urls=$(aws ec2 describe-instances --region $region --instance-ids $(aws autoscaling describe-auto-scaling-groups --region $region --auto-scaling-group-name $asg_name | jq '.AutoScalingGroups[0].Instances[] | select(.LifecycleState  == "InService") | .InstanceId' | xargs) | jq -r ".Reservations[].Instances | map(\"$etcd_client_scheme://\" + .NetworkInterfaces[].PrivateIpAddress + \":2379\")[]" | sed -e ':a;N;$!ba;s/\n/,/g')
 
-if [[ ! $etcd_peer_urls ]]; then
-    echo "$pkg: unable to find members of auto scaling group"
-    exit 5
+if [[ $etcd_proxy ]]; then
+  etcd_proxy_list=$(aws ec2 describe-instances --region $region --instance-ids $(aws autoscaling describe-auto-scaling-groups --region $region --auto-scaling-group-name $asg_name | jq '.AutoScalingGroups[0].Instances[] | select(.LifecycleState  == "InService") | .InstanceId' | xargs) | jq -r ".Reservations[].Instances | map(.InstanceId + \"=$etcd_client_scheme://\" + .NetworkInterfaces[].PrivateIpAddress + \":2379\")[]" | sed -e ':a;N;$!ba;s/\n/,/g')
+  if [[ ! $etcd_proxy_list ]]; then
+      echo "$pkg: unable to find members of auto scaling group for proxy list"
+      exit 5
+  fi
+
+  echo "$etcd_proxy_list"
+
+else
+  etcd_peer_urls=$(aws ec2 describe-instances --region $region --instance-ids $(aws autoscaling describe-auto-scaling-groups --region $region --auto-scaling-group-name $asg_name | jq '.AutoScalingGroups[0].Instances[] | select(.LifecycleState  == "InService") | .InstanceId' | xargs) | jq -r ".Reservations[].Instances | map(\"$etcd_client_scheme://\" + .NetworkInterfaces[].PrivateIpAddress + \":2379\")[]" | sed -e ':a;N;$!ba;s/\n/,/g')
+  if [[ ! $etcd_peer_urls ]]; then
+      echo "$pkg: unable to find members of auto scaling group"
+      exit 5
+  fi
+
+  echo "$etcd_peer_urls"
 fi
-
-
-echo "$etcd_peer_urls"
 
 exit 0

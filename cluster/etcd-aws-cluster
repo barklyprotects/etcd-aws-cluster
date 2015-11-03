@@ -2,12 +2,22 @@
 pkg="etcd-aws-cluster"
 version="0.4"
 etcd_peers_file_path="/etc/sysconfig/etcd-peers"
+barkly_config="/etc/barkly/environment"
+
+if [ -f $barkly_config ]; then
+  source $barkly_config
+fi
+
+if [[ $PLATFORM == "vagrant"  ]]; then
+  touch $etcd_peers_file_path
+  exit 0
+fi
+
 region=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | jq --raw-output .region)
 if [[ ! $region ]]; then
     echo "$pkg: failed to get region"
     exit 1
 fi
-
 
 # ETCD API https://coreos.com/etcd/docs/2.0.11/other_apis.html
 add_ok=201

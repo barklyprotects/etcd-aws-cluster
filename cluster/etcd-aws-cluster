@@ -24,10 +24,9 @@ add_ok=201
 already_added=409
 delete_ok=204
 
-#if the script has already run just exit
+#if the script has already run alert user.
 if [ -f "$etcd_peers_file_path" ]; then
-    echo "$pkg: etcd-peers file $etcd_peers_file_path already created, exiting"
-    exit 0
+    echo "$pkg: etcd-peers file $etcd_peers_file_path already created, still running..."
 fi
 
 ec2_instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
